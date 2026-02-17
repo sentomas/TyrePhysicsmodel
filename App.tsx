@@ -9,7 +9,7 @@ import { FractureMechanicsCard } from './components/FractureMechanicsCard';
 import { PhysicsModelInfo } from './components/PhysicsModelInfo';
 import { AboutTile } from './components/AboutTile';
 import { TyreConfigModal } from './components/TyreConfigModal';
-import { Settings, RefreshCw } from 'lucide-react';
+import { Settings, RefreshCw, Code } from 'lucide-react';
 
 const STORAGE_KEY = 'tyreTwinState_v3';
 
@@ -72,7 +72,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-indigo-500/30">
+    <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-indigo-500/30 flex flex-col">
       <TyreConfigModal 
         isOpen={isConfigOpen} 
         onClose={() => setIsConfigOpen(false)}
@@ -108,7 +108,7 @@ const App: React.FC = () => {
         </div>
       </nav>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6 flex-grow">
         
         {/* Top Section: Digital Twin Card & Controls */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -152,6 +152,16 @@ const App: React.FC = () => {
         </div>
 
       </main>
+
+      {/* Footer */}
+      <footer className="border-t border-slate-900 bg-slate-950 py-6">
+         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col items-center justify-center gap-2 text-center">
+            <p className="text-slate-500 text-sm flex items-center gap-2">
+               <Code className="w-4 h-4 text-slate-600" />
+               <span>Designed and Developed by <a href="mailto:serin.thomas@outlook.com" className="text-indigo-400 hover:text-indigo-300 transition-colors font-medium">serin.thomas@outlook.com</a></span>
+            </p>
+         </div>
+      </footer>
     </div>
   );
 };

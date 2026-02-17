@@ -1,0 +1,5 @@
+{
+  "name": "TyreTwin Analytics",
+  "description": "A Digital Twin application for tyre lifecycle monitoring, bloom analysis, tread wear prediction, and predictive maintenance using physics-informed models and AI vision.",
+  "requestFramePermissions": []
+}

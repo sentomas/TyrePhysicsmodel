@@ -73,10 +73,10 @@ export const PhysicsModelInfo: React.FC = () => {
              <span className="font-semibold text-slate-200 text-sm">Friction & Wear</span>
           </div>
           <p className="text-xs text-slate-400 leading-relaxed mb-3">
-            Tread depth degrades based on friction coeff derived from speed and temperature. High temps soften rubber, increasing wear rate.
+            Wear is calculated using <strong>Archard's Equation</strong>. Distance traveled is derived from simulation ticks. Hotter rubber softens and abrades faster.
           </p>
           <div className="text-[10px] font-mono bg-slate-900 p-2 rounded text-slate-500">
-             Wear = Speed * Temp * Coeff
+             Δd = k * Distance * (1 + Temp/100)
           </div>
         </div>
 

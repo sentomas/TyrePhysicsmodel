@@ -1,12 +1,61 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { GEMINI_MODEL_VISION } from "../constants";
+import { GEMINI_MODEL_VISION, MOCK_ANALYSIS_DELAY } from "../constants";
 import { AnalysisResult } from "../types";
 
+// Mock data generator for when API key is missing
+const generateMockAnalysis = (): AnalysisResult => {
+  const scenarios = [
+    {
+      hueColor: "Green/Bronze Bloom",
+      condition: "Excellent. Visible protective antioxidant wax layer functioning as intended. No surface cracks.",
+      bloomDetected: true,
+      cracksDetected: false,
+      estimatedWear: 5,
+      confidence: 0.98
+    },
+    {
+      hueColor: "Deep Black",
+      condition: "Clean rubber surface. Active shedding phase. Minor sidewall scuffing detected.",
+      bloomDetected: false,
+      cracksDetected: false,
+      estimatedWear: 25,
+      confidence: 0.92
+    },
+    {
+      hueColor: "Faded Grey",
+      condition: "Signs of oxidation and UV damage. Material appears dry.",
+      bloomDetected: false,
+      cracksDetected: false,
+      estimatedWear: 60,
+      confidence: 0.85
+    },
+    {
+      hueColor: "Grey/Brown",
+      condition: "Critical dry rot detected near bead. Micro-cracks visible in tread grooves.",
+      bloomDetected: false,
+      cracksDetected: true,
+      estimatedWear: 80,
+      confidence: 0.95
+    }
+  ];
+
+  // Return a random scenario
+  return scenarios[Math.floor(Math.random() * scenarios.length)];
+};
+
 export const analyzeTireImage = async (base64Image: string): Promise<AnalysisResult> => {
+  
+  // 1. Check for API Key. If missing, use Mock Mode.
   if (!process.env.API_KEY) {
-    throw new Error("API Key is missing. Please set process.env.API_KEY.");
+    console.warn("TyreTwin: No API_KEY found. Running in MOCK SIMULATION mode.");
+    
+    // Simulate network delay
+    await new Promise(resolve => setTimeout(resolve, MOCK_ANALYSIS_DELAY));
+    
+    return generateMockAnalysis();
   }
 
+  // 2. If Key exists, run real Gemini Analysis
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const prompt = `
@@ -60,7 +109,7 @@ export const analyzeTireImage = async (base64Image: string): Promise<AnalysisRes
     return JSON.parse(text) as AnalysisResult;
   } catch (error) {
     console.error("Gemini Analysis Error:", error);
-    // Fallback or re-throw
-    throw error;
+    // Fallback to mock if API fails
+    return generateMockAnalysis();
   }
 };

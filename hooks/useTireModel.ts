@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { TyreModelData, TyreState, SimulationParams, TyreProperties } from '../types';
-import { INITIAL_WAX_RESERVE, WARNING_WAX_THRESHOLD, CRITICAL_INTEGRITY_THRESHOLD, INITIAL_TREAD_DEPTH, MIN_TREAD_DEPTH } from '../constants';
+import { INITIAL_WAX_RESERVE, WARNING_WAX_THRESHOLD, CRITICAL_INTEGRITY_THRESHOLD, MIN_TREAD_DEPTH } from '../constants';
 
 export const useTyreModel = (
   params: SimulationParams, 
@@ -50,13 +50,13 @@ export const useTyreModel = (
       // Soft compounds bloom easier but wear faster.
       // 6PPD is highly effective but consumed faster.
       let diffusionMultiplier = 1.0;
-      let wearMultiplier = 1.0;
+      let wearResistance = 1.0; // Higher is better
 
       if (currentProps.rubberCompound === 'Soft (Sport)') {
-        wearMultiplier = 1.5;
+        wearResistance = 0.6; // Wears fast
         diffusionMultiplier = 1.2; // Porous
       } else if (currentProps.rubberCompound === 'Hard (Eco/Touring)') {
-        wearMultiplier = 0.7;
+        wearResistance = 1.4; // Wears slow
         diffusionMultiplier = 0.8; // Dense
       }
 
@@ -64,56 +64,68 @@ export const useTyreModel = (
         diffusionMultiplier *= 1.1; // Fast migration
       }
 
-      // 1. Wax Diffusion (Blooming)
+      // 1. Wax Diffusion (Blooming) - Fick's First Law Approximation
+      // Rate depends on concentration gradient (WaxReserve) and Temperature
       const baseDiffusionRate = (temperature > 15 ? (temperature - 15) / 50 : 0.05) * (waxReserve / 100);
       const diffusionRate = baseDiffusionRate * diffusionMultiplier;
       
       if (!isMoving) {
-        // Accumulate bloom
+        // Accumulate bloom (Stagnant)
         if (waxReserve > 0) {
           const bloomIncrease = diffusionRate * 0.5; 
           surfaceBloom = Math.min(100, surfaceBloom + bloomIncrease);
           waxReserve = Math.max(0, waxReserve - (bloomIncrease * 0.1)); 
         }
       } else {
-        // Shed bloom due to flex
+        // Shed bloom due to mechanical flex and wind shear
         const shedRate = (speed / 100) * 2;
         surfaceBloom = Math.max(0, surfaceBloom - shedRate);
         
-        // Mileage accrual
-        mileage += (speed * 0.01); 
+        // Mileage accrual: 1 Tick @ 100km/h = 1km traveled (Accelerated Simulation Time)
+        const distanceStep = (speed * 0.01); 
+        mileage += distanceStep;
+
+        // 2. Tread Wear Logic (Archard's Equation adapted)
+        // Wear Volume = (k * Load * Distance) / Hardness
+        // We simulate mm loss per km.
+        // Base rate: 1mm loss per 15,000km under normal conditions.
+        // 1km wear = 1 / 15000 = 0.000066 mm/km
+        
+        const baseWearPerKm = 0.000066;
+        
+        // Temperature Penalty: Hot rubber is softer (abrades 20% faster per 10 degrees over 25C)
+        const thermalSoftening = Math.max(1, 1 + ((temperature - 25) / 50));
+        
+        // Speed Penalty: Energy varies with square of speed, but wear is roughly linear to aggressive driving
+        const aggressionFactor = Math.max(1, speed / 80); 
+
+        const wearStep = distanceStep * baseWearPerKm * thermalSoftening * aggressionFactor * (1 / wearResistance);
+        
+        treadDepth = Math.max(0, treadDepth - wearStep);
       }
 
-      // 2. Tread Wear Logic (New)
-      // Wear is proportional to speed (friction)
-      if (isMoving) {
-        // Base wear rate * speed factor * temperature penalty (hotter = softer rubber = faster wear)
-        const tempFactor = Math.max(1, temperature / 20);
-        const wearRate = (speed / 100) * 0.005 * tempFactor * wearMultiplier;
-        treadDepth = Math.max(0, treadDepth - wearRate);
-      }
-
-      // 3. Oxidation & Degradation
+      // 3. Oxidation & Degradation (Arrhenius Equation simplified)
+      // UV and Ozone attack polymer chains. Wax bloom blocks this.
       const protectionFactor = surfaceBloom / 100;
       const environmentalStress = (uvIndex / 10) + (ozoneLevel / 200); 
       const damageRate = environmentalStress * (1 - protectionFactor) * 0.05;
 
       oxidationLevel = Math.min(100, oxidationLevel + damageRate);
 
-      // 4. Structural Integrity (Dry Rot + Low Tread)
-      // Curing time effect: Optimal curing (approx 15-20 mins) gives best integrity. 
-      // Deviation weakens initial resistance.
+      // 4. Structural Integrity (Fracture Mechanics)
+      // Once wax is gone, dry rot sets in logarithmically based on oxidation
       let integrityLossMultiplier = 1.0;
       if (currentProps.curingTime < 12) integrityLossMultiplier = 1.2;
 
       if (oxidationLevel > 30 || waxReserve < 5) {
-        const rotRate = ((oxidationLevel / 1000) + (waxReserve < 5 ? 0.05 : 0)) * integrityLossMultiplier;
+        // Paris Law approximation for crack growth
+        const rotRate = ((oxidationLevel / 2000) + (waxReserve < 5 ? 0.02 : 0)) * integrityLossMultiplier;
         structuralIntegrity = Math.max(0, structuralIntegrity - rotRate);
       }
       
-      // Accelerated integrity loss if tread is critically low (structural exposure)
+      // Accelerated integrity loss if tread is critically low (carcass exposure risk)
       if (treadDepth < MIN_TREAD_DEPTH) {
-         structuralIntegrity = Math.max(0, structuralIntegrity - 0.1);
+         structuralIntegrity = Math.max(0, structuralIntegrity - 0.05);
       }
 
       // 5. State Determination
@@ -128,15 +140,17 @@ export const useTyreModel = (
         newState = TyreState.ACTIVE; // Deep black / clean
       }
 
-      // 6. RUL Calculation 
+      // 6. RUL Calculation (Remaining Useful Life)
       // Weighted average of Chemical RUL (Wax/Oxidation) and Mechanical RUL (Tread)
       
       // Chemical Life
       const chemicalRul = (structuralIntegrity / 100) * (waxReserve * 10) + 100;
       
       // Mechanical Life (Tread remaining / Rate)
-      // Assuming avg linear degradation, approx mapping mm to days
-      const mechanicalRul = Math.max(0, (treadDepth - MIN_TREAD_DEPTH) * 200 / wearMultiplier); 
+      // Rate is dynamic, so we use a moving average concept or current params
+      const projectedRangeKm = Math.max(0, (treadDepth - MIN_TREAD_DEPTH) / (0.000066 * (1/wearResistance)));
+      // Convert km to days based on avg usage (e.g. 50km/day)
+      const mechanicalRul = projectedRangeKm / 50; 
 
       const finalRul = Math.min(chemicalRul, mechanicalRul);
 

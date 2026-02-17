@@ -2,6 +2,18 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { GEMINI_MODEL_VISION, MOCK_ANALYSIS_DELAY } from "../constants";
 import { AnalysisResult } from "../types";
 
+// Helper to safely access API Key without crashing in environments where 'process' is undefined
+const getApiKey = (): string | undefined => {
+  try {
+    if (typeof process !== 'undefined' && process.env) {
+      return process.env.API_KEY;
+    }
+  } catch (e) {
+    // Ignore reference errors
+  }
+  return undefined;
+};
+
 // Mock data generator for when API key is missing
 const generateMockAnalysis = (): AnalysisResult => {
   const scenarios = [
@@ -45,8 +57,10 @@ const generateMockAnalysis = (): AnalysisResult => {
 
 export const analyzeTireImage = async (base64Image: string): Promise<AnalysisResult> => {
   
+  const apiKey = getApiKey();
+
   // 1. Check for API Key. If missing, use Mock Mode.
-  if (!process.env.API_KEY) {
+  if (!apiKey) {
     console.warn("TyreTwin: No API_KEY found. Running in MOCK SIMULATION mode.");
     
     // Simulate network delay
@@ -56,7 +70,7 @@ export const analyzeTireImage = async (base64Image: string): Promise<AnalysisRes
   }
 
   // 2. If Key exists, run real Gemini Analysis
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey: apiKey });
   
   const prompt = `
     Analyze this tyre sidewall and tread image for health and material condition.
